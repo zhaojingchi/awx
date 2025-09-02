@@ -1,0 +1,27 @@
+---
+- name: Apply kernel fixes on all Kubernetes nodes
+  hosts: all  # 这个任务将在您 inventory 文件中的所有主机上运行
+  become: yes
+  
+  tasks:
+    - name: Ensure br_netfilter kernel module is loaded
+      ansible.builtin.modprobe:
+        name: br_netfilter
+        state: present
+    
+    - name: Set and persist bridge-nf-call-iptables sysctl parameter
+      ansible.builtin.sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: '1'
+        state: present
+        reload: yes
+        sysctl_file: /etc/sysctl.d/99-kubernetes-flannel.conf
+
+- name: Restart kube-flannel DaemonSet from the master node
+  hosts: k8s_master # 这个任务只在 master 节点上运行
+  become: yes
+  
+  tasks:
+    - name: Trigger a rolling restart of kube-flannel
+      ansible.builtin.shell: "kubectl rollout restart daemonset/kube-flannel-ds -n kube-flannel"
+      run_once: true

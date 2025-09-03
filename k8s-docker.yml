@@ -1,0 +1,71 @@
+- name: Install Docker and run rancher agent
+  hosts: all
+  become: yes
+  vars:
+    docker_version: "5:27.5.1-1~ubuntu.22.04~jammy" # 适配Ubuntu 22.04，请根据你的系统修改
+    rancher_agent_image: "registry.cn-hangzhou.aliyuncs.com/rancher/rancher-agent:v2.7.9"
+    rancher_agent_command: >
+      docker run -d --privileged --restart=unless-stopped --net=host -v /etc/kubernetes:/etc/kubernetes -v /var/run:/var/run
+      {{ rancher_agent_image }}
+      --server https://192.168.225.131:8444 --token mdg6z86tszhs4h9htlktrk4skt7c62lp4b5zrcfkbcm28cclhwm9nq --ca-checksum 79df8dd4cc5c839d48ae7079bd33baf9294c77e5dc2adc2ecbbd703b5e08ff63 --worker
+      
+  tasks:
+    - name: Uninstall old versions of Docker
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - docker
+        - docker-engine
+        - docker.io
+        - containerd
+        - runc
+      ignore_errors: yes
+
+    - name: Add Docker GPG apt key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Install specific version of Docker Engine
+      ansible.builtin.apt:
+        name: "docker-ce={{ docker_version }}"
+        state: present
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Install Docker for CentOS/RHEL
+      ansible.builtin.yum:
+        name: "docker-ce-{{ docker_version }}"
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure Docker service is running and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Check if the rancher agent container is already running
+      ansible.builtin.shell: docker ps -a --filter "ancestor={{ rancher_agent_image }}" --format "{{ '{{.ID}}' }}"
+      register: rancher_container_id
+      ignore_errors: yes
+
+    - name: Stop and remove existing rancher agent container if it exists
+      ansible.builtin.shell: docker rm -f {{ rancher_container_id.stdout }}
+      when: rancher_container_id.stdout is defined and rancher_container_id.stdout != ""
+
+    - name: Run rancher agent container
+      ansible.builtin.shell: "{{ rancher_agent_command }}"
+      args:
+        creates: /var/run/docker.sock # 确保幂等性，这个参数可能需要根据实际情况调整
+      register: rancher_run_result
+      changed_when: rancher_run_result.rc == 0

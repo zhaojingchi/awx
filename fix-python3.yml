@@ -4,6 +4,16 @@
   become: yes
   gather_facts: no
   tasks:
+    - name: Try to import 'six' module
+      ansible.builtin.command:
+        cmd: python3.12 -c "import six"
+      register: six_check
+      failed_when: "'No module named' in six_check.stderr"
+      
+    - name: Display result
+      ansible.builtin.debug:
+        msg: "The 'six' module was found."
+        
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: yes

@@ -1,7 +1,13 @@
 ---
-- name: Ping all inventory hosts
+- name: Ping All Servers
   hosts: all
-  gather_facts: no
+  gather_facts: false
   tasks:
-    - name: Ping host to check connectivity
+    - name: Test server connectivity
       ansible.builtin.ping:
+      register: ping_result
+      
+    - name: Show ping results
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} - Connection successful"
+      when: ping_result is succeeded

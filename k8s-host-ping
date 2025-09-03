@@ -1,0 +1,7 @@
+---
+- name: Ping all inventory hosts
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Ping host to check connectivity
+      ansible.builtin.ping:

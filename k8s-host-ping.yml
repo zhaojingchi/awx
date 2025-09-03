@@ -1,13 +1,13 @@
 ---
-- name: Ping All Servers
+- name: Test server connectivity
   hosts: all
   gather_facts: false
   tasks:
-    - name: Test server connectivity
-      ansible.builtin.ping:
-      register: ping_result
+    - name: Test connectivity using command
+      ansible.builtin.command: echo "Connection test successful"
+      register: connection_result
+      changed_when: false
       
-    - name: Show ping results
+    - name: Display connection result
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} - Connection successful"
-      when: ping_result is succeeded
+        msg: "{{ inventory_hostname }} is reachable - {{ connection_result.stdout }}"
